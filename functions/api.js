@@ -42,13 +42,11 @@ async function login(event) {
   const { usuario, pin } = JSON.parse(event.body || '{}');
   if (!usuario || !pin) return err('Usuário e PIN são obrigatórios');
 
-  // Checa admin primeiro
   if (usuario === ADMIN_USERNAME && pin === ADMIN_PIN) {
     const token = jwt.sign({ role: 'admin', username: usuario }, JWT_SECRET, { expiresIn: '8h' });
     return ok({ sucesso: true, role: 'admin', token });
   }
 
-  // Checa promotor
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
@@ -198,7 +196,10 @@ async function atualizarBrinde(event) {
   try {
     const { rows } = await client.query(
       `UPDATE brindes
-       SET nome = $1, quantidade_inicial = $2, ativo = $3
+       SET nome = $1,
+           quantidade_inicial = $2,
+           quantidade_disponivel = $2 - (quantidade_inicial - quantidade_disponivel),
+           ativo = $3
        WHERE id = $4
        RETURNING id, nome, quantidade_disponivel AS "quantidadeDisponivel",
                  quantidade_inicial AS "quantidadeInicial", ativo`,
