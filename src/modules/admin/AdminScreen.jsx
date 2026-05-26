@@ -3,13 +3,15 @@ import { useToast } from '../../hooks/useToast.jsx'
 import {
   getMetricas, getBrindesAdmin, getLeads,
   criarBrinde, atualizarBrinde, deletarBrinde,
-  logoutAdmin,
+  getPromotores, criarPromotor, atualizarPromotor, deletarPromotor,
+  logout,
 } from '../../services/api'
 import MetricsGrid from './MetricsGrid'
 import BrindesTable from './BrindesTable'
 import LeadsTable from './LeadsTable'
 import FiltrosLeads from './FiltrosLeads'
 import ModalBrinde from './ModalBrinde'
+import ModalPromotor from './ModalPromotor'
 import ModalConfirm from './ModalConfirm'
 
 function SkeletonMetrics() {
@@ -66,23 +68,30 @@ function baixarCSV(leads) {
 
 export default function AdminScreen({ onLogout }) {
   const { toast, ToastContainer } = useToast()
+
   const [metricas, setMetricas]             = useState(null)
   const [brindes, setBrindes]               = useState([])
   const [leads, setLeads]                   = useState([])
   const [leadsFiltrados, setLeadsFiltrados] = useState([])
   const [filtros, setFiltros]               = useState({})
+  const [promotores, setPromotores]         = useState([])
   const [loading, setLoading]               = useState(true)
-  const [modalBrinde, setModalBrinde]       = useState(false)
-  const [brindeEditando, setBrindeEditando] = useState(null)
-  const [confirmDelete, setConfirmDelete]   = useState(null)
+
+  const [modalBrinde, setModalBrinde]           = useState(false)
+  const [brindeEditando, setBrindeEditando]     = useState(null)
+  const [modalPromotor, setModalPromotor]       = useState(false)
+  const [promotorEditando, setPromotorEditando] = useState(null)
+  const [confirmDelete, setConfirmDelete]       = useState(null)
 
   useEffect(() => { carregarTudo() }, [])
 
   async function carregarTudo() {
     setLoading(true)
     try {
-      const [m, b, l] = await Promise.all([getMetricas(), getBrindesAdmin(), getLeads()])
-      setMetricas(m); setBrindes(b); setLeads(l); setLeadsFiltrados(l)
+      const [m, b, l, p] = await Promise.all([
+        getMetricas(), getBrindesAdmin(), getLeads(), getPromotores(),
+      ])
+      setMetricas(m); setBrindes(b); setLeads(l); setLeadsFiltrados(l); setPromotores(p)
     } catch {
       toast.erro('Erro ao carregar dados do painel.')
     } finally {
@@ -90,22 +99,19 @@ export default function AdminScreen({ onLogout }) {
     }
   }
 
+  // ── Leads ──
   function handleChangeFiltro(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }))
   }
-
   async function handleFiltrar() {
-    try {
-      const resultado = await getLeads(filtros)
-      setLeadsFiltrados(resultado)
-    } catch {
-      toast.erro('Erro ao aplicar filtros.')
-    }
+    try { setLeadsFiltrados(await getLeads(filtros)) }
+    catch { toast.erro('Erro ao aplicar filtros.') }
   }
 
-  function abrirModalNovo()    { setBrindeEditando(null); setModalBrinde(true) }
-  function abrirModalEditar(b) { setBrindeEditando(b);    setModalBrinde(true) }
-  function fecharModalBrinde() { setModalBrinde(false);   setBrindeEditando(null) }
+  // ── Brindes ──
+  function abrirModalNovoBrinde()    { setBrindeEditando(null); setModalBrinde(true) }
+  function abrirModalEditarBrinde(b) { setBrindeEditando(b);    setModalBrinde(true) }
+  function fecharModalBrinde()       { setModalBrinde(false);   setBrindeEditando(null) }
 
   async function handleSalvarBrinde({ id, nome, quantidadeInicial, ativo }) {
     try {
@@ -115,28 +121,45 @@ export default function AdminScreen({ onLogout }) {
       const [m, b] = await Promise.all([getMetricas(), getBrindesAdmin()])
       setMetricas(m); setBrindes(b)
       toast.sucesso('Brinde salvo com sucesso.')
-    } catch (e) {
-      toast.erro('Erro ao salvar brinde: ' + e.message)
-    }
+    } catch (e) { toast.erro('Erro ao salvar brinde: ' + e.message) }
   }
 
+  // ── Promotores ──
+  function abrirModalNovoPromotor()    { setPromotorEditando(null); setModalPromotor(true) }
+  function abrirModalEditarPromotor(p) { setPromotorEditando(p);    setModalPromotor(true) }
+  function fecharModalPromotor()       { setModalPromotor(false);   setPromotorEditando(null) }
+
+  async function handleSalvarPromotor({ id, nome, pin, ativo }) {
+    try {
+      if (id) await atualizarPromotor(id, { nome, pin, ativo })
+      else    await criarPromotor({ nome, pin })
+      fecharModalPromotor()
+      setPromotores(await getPromotores())
+      toast.sucesso('Promotor salvo com sucesso.')
+    } catch (e) { toast.erro('Erro ao salvar promotor: ' + e.message) }
+  }
+
+  // ── Delete ──
   async function handleConfirmarDelete() {
-    const id = confirmDelete
+    const { tipo, id } = confirmDelete
     setConfirmDelete(null)
     try {
-      await deletarBrinde(id)
-      const [m, b] = await Promise.all([getMetricas(), getBrindesAdmin()])
-      setMetricas(m); setBrindes(b)
-      toast.sucesso('Brinde excluído.')
-    } catch (e) {
-      toast.erro('Erro ao excluir: ' + e.message)
-    }
+      if (tipo === 'brinde') {
+        await deletarBrinde(id)
+        const [m, b] = await Promise.all([getMetricas(), getBrindesAdmin()])
+        setMetricas(m); setBrindes(b)
+        toast.sucesso('Brinde excluído.')
+      } else {
+        await deletarPromotor(id)
+        setPromotores(await getPromotores())
+        toast.sucesso('Promotor excluído.')
+      }
+    } catch (e) { toast.erro('Erro ao excluir: ' + e.message) }
   }
 
-  function handleLogout() {
-    logoutAdmin()
-    onLogout()
-  }
+  function handleLogout() { logout(); onLogout() }
+
+  const btnAcao = { width: 'auto', padding: '4px 12px', fontSize: 13 }
 
   return (
     <>
@@ -155,21 +178,73 @@ export default function AdminScreen({ onLogout }) {
 
       {loading ? <SkeletonMetrics /> : <MetricsGrid metricas={metricas} />}
 
+      {/* Promotores */}
+      <div className="admin-section">
+        <div className="section-title">
+          <span>Gerenciar promotores</span>
+          <button onClick={abrirModalNovoPromotor} className="btn-ghost">+ Novo promotor</button>
+        </div>
+        {loading ? <SkeletonTable colunas={4} linhas={3} /> : (
+          <div className="table">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nome</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promotores.length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', opacity: .5 }}>Nenhum promotor cadastrado</td></tr>
+                )}
+                {promotores.map(p => (
+                  <tr key={p.id}>
+                    <td>{p.id}</td>
+                    <td>{p.nome}</td>
+                    <td>{p.ativo ? 'Ativo' : 'Inativo'}</td>
+                    <td>
+                      <button
+                        className="btn-ghost"
+                        style={{ ...btnAcao, marginRight: 6 }}
+                        onClick={() => abrirModalEditarPromotor(p)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn-danger"
+                        style={btnAcao}
+                        onClick={() => setConfirmDelete({ tipo: 'promotor', id: p.id })}
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Brindes */}
       <div className="admin-section">
         <div className="section-title">
           <span>Gerenciar brindes</span>
-          <button onClick={abrirModalNovo} className="btn-ghost">+ Novo brinde</button>
+          <button onClick={abrirModalNovoBrinde} className="btn-ghost">+ Novo brinde</button>
         </div>
         {loading
           ? <SkeletonTable colunas={7} linhas={4} />
           : <BrindesTable
               brindes={brindes}
-              onEditar={abrirModalEditar}
-              onDeletar={(id) => setConfirmDelete(id)}
+              onEditar={abrirModalEditarBrinde}
+              onDeletar={(id) => setConfirmDelete({ tipo: 'brinde', id })}
             />
         }
       </div>
 
+      {/* Leads */}
       <div className="admin-section">
         <div className="section-title">
           <span>Distribuições realizadas</span>
@@ -202,9 +277,22 @@ export default function AdminScreen({ onLogout }) {
         />
       )}
 
+      {modalPromotor && (
+        <ModalPromotor
+          key={promotorEditando?.id ?? 'novo'}
+          promotor={promotorEditando}
+          onSalvar={handleSalvarPromotor}
+          onFechar={fecharModalPromotor}
+        />
+      )}
+
       {confirmDelete && (
         <ModalConfirm
-          mensagem="Tem certeza que deseja excluir este brinde? Esta ação não pode ser desfeita."
+          mensagem={
+            confirmDelete.tipo === 'brinde'
+              ? 'Tem certeza que deseja excluir este brinde? Esta ação não pode ser desfeita.'
+              : 'Tem certeza que deseja excluir este promotor? Esta ação não pode ser desfeita.'
+          }
           onConfirmar={handleConfirmarDelete}
           onCancelar={() => setConfirmDelete(null)}
         />

@@ -1,16 +1,23 @@
-import { useState } from 'react'
-import { loginAdmin } from '../../services/api'
+import { useState, useEffect } from 'react'
+import { login } from '../../services/api'
 
-export default function LoginScreen({ onLoginOk, onVoltar }) {
-  const [username, setUsername] = useState('')
-  const [pin, setPin]           = useState('')
-  const [erros, setErros]       = useState({})
-  const [loading, setLoading]   = useState(false)
+export default function LoginScreen({ onLoginAdmin, onLoginPromotor }) {
+  const [usuario, setUsuario] = useState('')
+  const [pin, setPin]         = useState('')
+  const [erros, setErros]     = useState({})
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const ultimo = localStorage.getItem('sl_ultimo_usuario')
+    const ultimoPin = localStorage.getItem('sl_ultimo_pin')
+    if (ultimo)    setUsuario(ultimo)
+    if (ultimoPin) setPin(ultimoPin)
+  }, [])
 
   function validar() {
     const e = {}
-    if (!username) e.username = 'Informe o usuário.'
-    if (!pin)      e.pin      = 'Informe o PIN.'
+    if (!usuario.trim()) e.usuario = 'Informe o usuário.'
+    if (!pin.trim())     e.pin     = 'Informe o PIN.'
     setErros(e)
     return Object.keys(e).length === 0
   }
@@ -20,8 +27,11 @@ export default function LoginScreen({ onLoginOk, onVoltar }) {
     setLoading(true)
     setErros({})
     try {
-      await loginAdmin({ username, pin })
-      onLoginOk()
+      const { role, promotora } = await login({ usuario: usuario.trim(), pin })
+      localStorage.setItem('sl_ultimo_usuario', usuario.trim())
+      localStorage.setItem('sl_ultimo_pin', pin)
+      if (role === 'admin')    onLoginAdmin()
+      if (role === 'promotor') onLoginPromotor({ promotora })
     } catch (e) {
       setErros({ geral: e.message })
     } finally {
@@ -34,7 +44,7 @@ export default function LoginScreen({ onLoginOk, onVoltar }) {
 
   return (
     <>
-      <h1>Área administrativa</h1>
+      <h1>Entrar</h1>
       <p className="subtitle">Insira suas credenciais para continuar</p>
 
       {erros.geral && <div className="erro">{erros.geral}</div>}
@@ -43,11 +53,12 @@ export default function LoginScreen({ onLoginOk, onVoltar }) {
         <input
           type="text"
           placeholder="Usuário"
-          value={username}
-          onChange={e => { setUsername(e.target.value); setErros(p => ({ ...p, username: '' })) }}
-          style={inputStyle('username')}
+          value={usuario}
+          onChange={e => { setUsuario(e.target.value); setErros(p => ({ ...p, usuario: '' })) }}
+          style={inputStyle('usuario')}
+          autoCapitalize="none"
         />
-        {erros.username && <div className="field-error">{erros.username}</div>}
+        {erros.usuario && <div className="field-error">{erros.usuario}</div>}
       </div>
 
       <div className="form-group">
@@ -64,9 +75,6 @@ export default function LoginScreen({ onLoginOk, onVoltar }) {
 
       <button onClick={handleLogin} disabled={loading}>
         {loading ? 'Verificando...' : 'Entrar'}
-      </button>
-      <button onClick={onVoltar} className="btn-secondary" disabled={loading}>
-        Voltar
       </button>
     </>
   )

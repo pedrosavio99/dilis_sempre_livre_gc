@@ -1,19 +1,18 @@
 import { useState } from 'react'
 import { useEventoConfig } from '../../hooks/useEventoConfig'
+import { logout } from '../../services/api'
 
-export default function SetupScreen({ onIniciar, onAdmin }) {
+export default function SetupScreen({ promotora, onIniciar, onSair }) {
   const { salvarConfig } = useEventoConfig()
-  const [promotora, setPromotora] = useState('')
-  const [cidade, setCidade]       = useState('')
-  const [ativacao, setAtivacao]   = useState('')
-  const [erros, setErros]         = useState({})
-  const [loading, setLoading]     = useState(false)
+  const [cidade, setCidade]     = useState('')
+  const [ativacao, setAtivacao] = useState('')
+  const [erros, setErros]       = useState({})
+  const [loading, setLoading]   = useState(false)
 
   function validar() {
     const e = {}
-    if (!promotora.trim()) e.promotora = 'Informe o nome da promotora.'
-    if (!cidade)           e.cidade    = 'Selecione a cidade.'
-    if (!ativacao)         e.ativacao  = 'Selecione a ativação.'
+    if (!cidade)   e.cidade   = 'Selecione a cidade.'
+    if (!ativacao) e.ativacao = 'Selecione a ativação.'
     setErros(e)
     return Object.keys(e).length === 0
   }
@@ -21,8 +20,13 @@ export default function SetupScreen({ onIniciar, onAdmin }) {
   function handleIniciar() {
     if (!validar()) return
     setLoading(true)
-    salvarConfig({ promotora: promotora.trim(), cidade, ativacao })
+    salvarConfig({ promotora, cidade, ativacao })
     onIniciar()
+  }
+
+  function handleSair() {
+    logout()
+    onSair()
   }
 
   const inputStyle = (campo) =>
@@ -33,25 +37,15 @@ export default function SetupScreen({ onIniciar, onAdmin }) {
       <div className="header-row">
         <div>
           <h1>Configuração do Evento</h1>
-          <p className="subtitle">Configure os dados da promotora antes de iniciar</p>
+          <p className="subtitle">Olá, <strong>{promotora}</strong>. Configure os dados antes de iniciar.</p>
         </div>
         <button
-          onClick={onAdmin}
+          onClick={handleSair}
+          className="btn-danger"
           style={{ width: 'auto', padding: '8px 16px', fontSize: 13, marginTop: 2 }}
         >
-          Admin
+          Sair
         </button>
-      </div>
-
-      <div className="form-group">
-        <input
-          type="text"
-          placeholder="Nome da promotora"
-          value={promotora}
-          onChange={e => { setPromotora(e.target.value); setErros(p => ({ ...p, promotora: '' })) }}
-          style={inputStyle('promotora')}
-        />
-        {erros.promotora && <div className="field-error">{erros.promotora}</div>}
       </div>
 
       <div className="form-group">

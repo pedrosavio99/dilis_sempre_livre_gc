@@ -1,19 +1,18 @@
 const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// ── DB & Auth config ─────────────────────────────────────────────────────────
+// ── DB & Auth config ──────────────────────────────────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sempre_livre_secret_mude_em_producao';
+const JWT_SECRET     = process.env.JWT_SECRET     || 'sempre_livre_secret_mude_em_producao';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
+const ADMIN_PIN      = process.env.ADMIN_PIN      || '1234';
 
 const cors = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Origin':  process.env.ALLOWED_ORIGIN || '*',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Content-Type': 'application/json',
@@ -37,17 +36,112 @@ function verifyToken(event) {
   }
 }
 
-// ── Route handlers ────────────────────────────────────────────────────────────
+// ── LOGIN UNIFICADO ───────────────────────────────────────────────────────────
 
-async function loginAdmin(event) {
-  const { username, pin } = JSON.parse(event.body || '{}');
-  if (!username || !pin) return err('Usuário e PIN são obrigatórios');
-  if (username !== ADMIN_USERNAME || pin !== ADMIN_PIN) return err('Usuário ou PIN inválido', 401);
-  const token = jwt.sign({ role: 'admin', username }, JWT_SECRET, { expiresIn: '8h' });
-  return ok({ sucesso: true, token });
+async function login(event) {
+  const { usuario, pin } = JSON.parse(event.body || '{}');
+  if (!usuario || !pin) return err('Usuário e PIN são obrigatórios');
+
+  // Checa admin primeiro
+  if (usuario === ADMIN_USERNAME && pin === ADMIN_PIN) {
+    const token = jwt.sign({ role: 'admin', username: usuario }, JWT_SECRET, { expiresIn: '8h' });
+    return ok({ sucesso: true, role: 'admin', token });
+  }
+
+  // Checa promotor
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      'SELECT id, nome, pin FROM promotores WHERE nome = $1 AND ativo = true',
+      [usuario]
+    );
+    if (!rows.length || rows[0].pin !== pin) {
+      return err('Usuário ou PIN inválido', 401);
+    }
+    const token = jwt.sign(
+      { role: 'promotor', promotora: rows[0].nome, id: rows[0].id },
+      JWT_SECRET,
+      { expiresIn: '12h' }
+    );
+    return ok({ sucesso: true, role: 'promotor', promotora: rows[0].nome, token });
+  } finally {
+    client.release();
+  }
 }
 
-// ── BRINDES ──
+// ── PROMOTORES ────────────────────────────────────────────────────────────────
+
+async function getPromotores(event) {
+  const user = verifyToken(event);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      'SELECT id, nome, pin, ativo FROM promotores ORDER BY nome'
+    );
+    return ok(rows);
+  } finally { client.release(); }
+}
+
+async function criarPromotor(event) {
+  const user = verifyToken(event);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
+  const { nome, pin } = JSON.parse(event.body || '{}');
+  if (!nome || !pin) return err('Nome e PIN são obrigatórios');
+  if (pin.length < 4) return err('PIN deve ter no mínimo 4 caracteres');
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      `INSERT INTO promotores (nome, pin)
+       VALUES ($1, $2)
+       RETURNING id, nome, pin, ativo`,
+      [nome.trim(), pin]
+    );
+    return ok(rows[0], 201);
+  } catch (e) {
+    if (e.code === '23505') return err('Já existe um promotor com esse nome');
+    throw e;
+  } finally { client.release(); }
+}
+
+async function atualizarPromotor(event) {
+  const user = verifyToken(event);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
+  const { id, nome, pin, ativo } = JSON.parse(event.body || '{}');
+  if (!id || !nome) return err('ID e nome são obrigatórios');
+  if (pin && pin.length < 4) return err('PIN deve ter no mínimo 4 caracteres');
+  const client = await pool.connect();
+  try {
+    const comPin = pin !== undefined && pin !== null && pin !== '';
+    const query = comPin
+      ? `UPDATE promotores SET nome = $1, pin = $2, ativo = $3 WHERE id = $4
+         RETURNING id, nome, pin, ativo`
+      : `UPDATE promotores SET nome = $1, ativo = $2 WHERE id = $3
+         RETURNING id, nome, pin, ativo`;
+    const values = comPin ? [nome.trim(), pin, ativo, id] : [nome.trim(), ativo, id];
+    const { rows } = await client.query(query, values);
+    if (!rows.length) return err('Promotor não encontrado', 404);
+    return ok(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return err('Já existe um promotor com esse nome');
+    throw e;
+  } finally { client.release(); }
+}
+
+async function deletarPromotor(event) {
+  const user = verifyToken(event);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
+  const { id } = JSON.parse(event.body || '{}');
+  if (!id) return err('ID é obrigatório');
+  const client = await pool.connect();
+  try {
+    const { rowCount } = await client.query('DELETE FROM promotores WHERE id = $1', [id]);
+    if (!rowCount) return err('Promotor não encontrado', 404);
+    return ok({ sucesso: true });
+  } finally { client.release(); }
+}
+
+// ── BRINDES ───────────────────────────────────────────────────────────────────
 
 async function getBrindesDisponiveis() {
   const client = await pool.connect();
@@ -79,7 +173,7 @@ async function getBrindesAdmin(event) {
 
 async function criarBrinde(event) {
   const user = verifyToken(event);
-  if (!user) return err('Não autorizado', 401);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
   const { nome, quantidadeInicial } = JSON.parse(event.body || '{}');
   if (!nome || !quantidadeInicial) return err('Nome e quantidade são obrigatórios');
   const client = await pool.connect();
@@ -97,7 +191,7 @@ async function criarBrinde(event) {
 
 async function atualizarBrinde(event) {
   const user = verifyToken(event);
-  if (!user) return err('Não autorizado', 401);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
   const { id, nome, quantidadeInicial, ativo } = JSON.parse(event.body || '{}');
   if (!id || !nome) return err('ID e nome são obrigatórios');
   const client = await pool.connect();
@@ -117,7 +211,7 @@ async function atualizarBrinde(event) {
 
 async function deletarBrinde(event) {
   const user = verifyToken(event);
-  if (!user) return err('Não autorizado', 401);
+  if (!user || user.role !== 'admin') return err('Não autorizado', 401);
   const { id } = JSON.parse(event.body || '{}');
   if (!id) return err('ID é obrigatório');
   const client = await pool.connect();
@@ -128,7 +222,7 @@ async function deletarBrinde(event) {
   } finally { client.release(); }
 }
 
-// ── LEADS ──
+// ── LEADS ─────────────────────────────────────────────────────────────────────
 
 async function cadastrarLead(event) {
   const { nome, email, telefone, brindeId, aceiteTermos, promotora, cidade, ativacao } =
@@ -221,8 +315,8 @@ async function getMetricas(event) {
     distribuicao.rows.forEach(r => { dist[r.brinde] = parseInt(r.total); });
     return ok({
       totalDistribuidos: parseInt(totalLeads.rows[0].count),
-      totalBrindes: parseInt(totalBrindes.rows[0].total),
-      totalAtivos: parseInt(totalBrindes.rows[0].ativos),
+      totalBrindes:      parseInt(totalBrindes.rows[0].total),
+      totalAtivos:       parseInt(totalBrindes.rows[0].ativos),
       distribuicaoPorBrinde: dist,
     });
   } finally { client.release(); }
@@ -233,32 +327,28 @@ async function getMetricas(event) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors, body: '' };
 
-  // Path format: /.netlify/functions/api/recurso
-  const path = (event.path || '').replace(/^.*\/api\/?/, '').replace(/\/$/, '');
+  const path   = (event.path || '').replace(/^.*\/api\/?/, '').replace(/\/$/, '');
   const method = event.httpMethod;
 
   try {
-    // POST /login
-    if (path === 'login' && method === 'POST') return await loginAdmin(event);
+    if (path === 'login' && method === 'POST') return await login(event);
 
-    // GET /brindes          → público (tela de lead)
+    if (path === 'promotores' && method === 'GET')    return await getPromotores(event);
+    if (path === 'promotores' && method === 'POST')   return await criarPromotor(event);
+    if (path === 'promotores' && method === 'PUT')    return await atualizarPromotor(event);
+    if (path === 'promotores' && method === 'DELETE') return await deletarPromotor(event);
+
     if (path === 'brindes' && method === 'GET') {
       const admin = event.queryStringParameters?.admin === 'true';
       return admin ? await getBrindesAdmin(event) : await getBrindesDisponiveis();
     }
-    // POST /brindes
-    if (path === 'brindes' && method === 'POST') return await criarBrinde(event);
-    // PUT /brindes
-    if (path === 'brindes' && method === 'PUT') return await atualizarBrinde(event);
-    // DELETE /brindes
+    if (path === 'brindes' && method === 'POST')   return await criarBrinde(event);
+    if (path === 'brindes' && method === 'PUT')    return await atualizarBrinde(event);
     if (path === 'brindes' && method === 'DELETE') return await deletarBrinde(event);
 
-    // POST /leads           → público (cadastro do participante)
     if (path === 'leads' && method === 'POST') return await cadastrarLead(event);
-    // GET /leads
-    if (path === 'leads' && method === 'GET') return await getLeads(event);
+    if (path === 'leads' && method === 'GET')  return await getLeads(event);
 
-    // GET /metricas
     if (path === 'metricas' && method === 'GET') return await getMetricas(event);
 
     return err(`Rota não encontrada: ${method} /${path}`, 404);
