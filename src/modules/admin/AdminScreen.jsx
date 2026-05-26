@@ -99,7 +99,6 @@ export default function AdminScreen({ onLogout }) {
     }
   }
 
-  // ── Leads ──
   function handleChangeFiltro(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }))
   }
@@ -108,7 +107,6 @@ export default function AdminScreen({ onLogout }) {
     catch { toast.erro('Erro ao aplicar filtros.') }
   }
 
-  // ── Brindes ──
   function abrirModalNovoBrinde()    { setBrindeEditando(null); setModalBrinde(true) }
   function abrirModalEditarBrinde(b) { setBrindeEditando(b);    setModalBrinde(true) }
   function fecharModalBrinde()       { setModalBrinde(false);   setBrindeEditando(null) }
@@ -124,7 +122,6 @@ export default function AdminScreen({ onLogout }) {
     } catch (e) { toast.erro('Erro ao salvar brinde: ' + e.message) }
   }
 
-  // ── Promotores ──
   function abrirModalNovoPromotor()    { setPromotorEditando(null); setModalPromotor(true) }
   function abrirModalEditarPromotor(p) { setPromotorEditando(p);    setModalPromotor(true) }
   function fecharModalPromotor()       { setModalPromotor(false);   setPromotorEditando(null) }
@@ -139,7 +136,6 @@ export default function AdminScreen({ onLogout }) {
     } catch (e) { toast.erro('Erro ao salvar promotor: ' + e.message) }
   }
 
-  // ── Delete ──
   async function handleConfirmarDelete() {
     const { tipo, id } = confirmDelete
     setConfirmDelete(null)
@@ -201,10 +197,10 @@ export default function AdminScreen({ onLogout }) {
                 )}
                 {promotores.map(p => (
                   <tr key={p.id}>
-                    <td>{p.id}</td>
-                    <td>{p.nome}</td>
-                    <td>{p.ativo ? 'Ativo' : 'Inativo'}</td>
-                    <td>
+                    <td data-label="#">{p.id}</td>
+                    <td data-label="Nome">{p.nome}</td>
+                    <td data-label="Status">{p.ativo ? 'Ativo' : 'Inativo'}</td>
+                    <td data-label="Ações">
                       <button
                         className="btn-ghost"
                         style={{ ...btnAcao, marginRight: 6 }}

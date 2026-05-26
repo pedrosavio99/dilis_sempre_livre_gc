@@ -25,14 +25,14 @@ export default function LeadsTable({ leads }) {
         <tbody>
           {leads.map((l, i) => (
             <tr key={l.id ?? i}>
-              <td>{l.dataHora}</td>
-              <td>{l.nome}</td>
-              <td>{l.email}</td>
-              <td>{l.telefone}</td>
-              <td>{l.brinde}</td>
-              <td>{l.promotora}</td>
-              <td>{l.cidade}</td>
-              <td>{l.ativacao}</td>
+              <td data-label="Data">{l.dataHora}</td>
+              <td data-label="Participante">{l.nome}</td>
+              <td data-label="E-mail">{l.email}</td>
+              <td data-label="Telefone">{l.telefone}</td>
+              <td data-label="Brinde">{l.brinde}</td>
+              <td data-label="Promotora">{l.promotora}</td>
+              <td data-label="Cidade">{l.cidade}</td>
+              <td data-label="Ativação">{l.ativacao}</td>
             </tr>
           ))}
         </tbody>

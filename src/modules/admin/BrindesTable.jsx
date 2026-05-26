@@ -23,18 +23,18 @@ export default function BrindesTable({ brindes, onEditar, onDeletar }) {
           )}
           {brindes.map(b => (
             <tr key={b.id}>
-              <td>{b.id}</td>
-              <td>{b.nome}</td>
-              <td>{b.quantidadeInicial}</td>
-              <td>{b.quantidadeDisponivel}</td>
-              <td>{b.quantidadeInicial - b.quantidadeDisponivel}</td>
-              <td>
+              <td data-label="ID">{b.id}</td>
+              <td data-label="Nome">{b.nome}</td>
+              <td data-label="Estoque inicial">{b.quantidadeInicial}</td>
+              <td data-label="Disponível">{b.quantidadeDisponivel}</td>
+              <td data-label="Distribuídos">{b.quantidadeInicial - b.quantidadeDisponivel}</td>
+              <td data-label="Status">
                 {b.ativo
                   ? <span style={{ color: '#1a7a38', fontWeight: 500, fontSize: 13 }}>Ativo</span>
                   : <span style={{ color: '#c0281f', fontWeight: 500, fontSize: 13 }}>Inativo</span>
                 }
               </td>
-              <td>
+              <td data-label="Ações">
                 <button className="btn-small btn-edit" onClick={() => onEditar(b)}>Editar</button>
                 <button className="btn-small btn-delete" onClick={() => onDeletar(b.id)}>Excluir</button>
               </td>
