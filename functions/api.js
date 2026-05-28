@@ -236,6 +236,21 @@ async function cadastrarLead(event) {
   try {
     await client.query('BEGIN');
 
+    // ── REGRA: mesmo email + mesmo brinde + mesmo dia = BLOQUEADO ─────────────
+    const { rows: duplicado } = await client.query(
+      `SELECT id FROM leads
+       WHERE LOWER(email) = LOWER($1)
+         AND ativacao     = $2
+         AND DATE(created_at AT TIME ZONE 'America/Recife') = (NOW() AT TIME ZONE 'America/Recife')::date
+       LIMIT 1`,
+      [email, ativacao]
+    );
+    if (duplicado.length) {
+      await client.query('ROLLBACK');
+      return err('Este e-mail já foi cadastrado neste jogo hoje. Tente novamente amanhã ou escolha outro jogo.', 409);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const brinde = await client.query(
       'SELECT id, nome, quantidade_disponivel FROM brindes WHERE id = $1 AND ativo = true FOR UPDATE',
       [brindeId]

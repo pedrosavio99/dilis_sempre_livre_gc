@@ -28,6 +28,81 @@ function SkeletonLead() {
   )
 }
 
+function ModalTermos({ onFechar }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+      onClick={onFechar}
+    >
+      <div
+        style={{
+          background: 'var(--bg-card, #fff)',
+          borderRadius: '12px',
+          width: '100%',
+          maxWidth: '560px',
+          maxHeight: '80vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--border, #eee)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+        }}>
+          <strong style={{ fontSize: '1rem', lineHeight: 1.4, flex: 1 }}>Termo de Autorização de Uso de Imagem e Dados</strong>
+          <button
+            onClick={onFechar}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              width: '28px', height: '28px', borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.1rem', color: 'var(--text-muted, #888)',
+              flexShrink: 0, padding: 0,
+            }}
+          >X</button>
+        </div>
+
+        <div style={{ padding: '16px 20px', overflowY: 'auto', fontSize: '0.85rem', lineHeight: 1.6 }}>
+          <p>
+            Eu ("AUTORIZADOR"), abaixo assinado, concedo à empresa <strong>Batuque Promoção, Eventos e Marketing Promocional LTDA</strong> (Batuque Promo), com sede na Rua Gomes de Carvalho, 1666 — Vila Olímpia — CEP 04.547-006 — São Paulo/SP, CNPJ: 00.946.790/0001-00, autorização em caráter gratuito para captar, fixar e usar meus direitos de imagem (nome, apelido, imagem, voz, demais características físicas, entrevistas e depoimentos), captados durante minha participação nas ativações da patrocinadora <strong>Sempre Livre</strong>, pertencente à <strong>JNTL CONSUMER HEALTH (BRAZIL) LTDA</strong>, CNPJ: 45.694.447/0001-46, nos eventos de São João em Caruaru e Campina Grande, no período de 30 de maio de 2026 a 05 de julho de 2026.
+          </p>
+
+          <p><strong>1.</strong> A JNTL poderá utilizar o material livremente, podendo adaptá-lo para produções audiovisuais, peças publicitárias e materiais promocionais em qualquer mídia existente ou futura (televisão, internet, redes sociais, etc.), inclusive para fins comerciais.</p>
+
+          <p><strong>2.</strong> Desta autorização não caberá qualquer remuneração ou compensação ao Autorizador.</p>
+
+          <p><strong>3.</strong> A utilização não tem limitação de tempo ou número de vezes, podendo ocorrer no Brasil e/ou no exterior.</p>
+
+          <p><strong>4.</strong> O Autorizador renuncia ao direito de aprovação prévia do material final.</p>
+
+          <p><strong>5.</strong> O Autorizador fica impedido de utilizar quaisquer materiais oriundos do Projeto sem prévia autorização escrita da JNTL.</p>
+
+          <p><strong>6.</strong> Todos os dados pessoais coletados serão tratados de acordo com a <strong>Lei Geral de Proteção de Dados (LGPD)</strong>, utilizados apenas para as finalidades descritas neste termo.</p>
+
+          <p><strong>7.</strong> Esta autorização é firmada em caráter gratuito, irrevogável e irretratável.</p>
+
+          <p><strong>8.</strong> O Autorizador declara ter ciência de todas as condições aqui constantes e que não há impedimento legal, religioso, moral ou pessoal para assinar esta Autorização.</p>
+        </div>
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border, #eee)' }}>
+          <button onClick={onFechar} style={{ width: '100%' }}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LeadScreen({ onSucesso, onNovaConfig }) {
   const { getConfig, limparConfig } = useEventoConfig()
   const { toast, ToastContainer }   = useToast()
@@ -43,6 +118,7 @@ export default function LeadScreen({ onSucesso, onNovaConfig }) {
   const [erros, setErros]       = useState({})
   const [loading, setLoading]   = useState(false)
   const [confirmNovaConfig, setConfirmNovaConfig] = useState(false)
+  const [modalTermos, setModalTermos] = useState(false)
 
   useEffect(() => { carregarBrindes() }, [])
 
@@ -125,6 +201,8 @@ export default function LeadScreen({ onSucesso, onNovaConfig }) {
     <>
       <ToastContainer />
 
+      {modalTermos && <ModalTermos onFechar={() => setModalTermos(false)} />}
+
       {config && (
         <div className="topInfo">
           <strong>{config.promotora}</strong>
@@ -188,7 +266,18 @@ export default function LeadScreen({ onSucesso, onNovaConfig }) {
                 onChange={e => { setTermos(e.target.checked); limparErro('termos') }}
               />
               <label htmlFor="termos">
-                Aceito os termos de uso e declaro que os dados são verdadeiros
+                Aceito os{' '}
+                <span
+                  onClick={() => setModalTermos(true)}
+                  style={{
+                    color: 'var(--primary, #007bff)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
+                >
+                  termos de uso
+                </span>
+                {' '}e declaro que os dados são verdadeiros
               </label>
             </div>
             {erros.termos && <div className="field-error" style={{ marginTop: 4 }}>{erros.termos}</div>}
